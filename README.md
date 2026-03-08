@@ -448,8 +448,8 @@ python3 scripts/format_summary.py --help
 
 ```bash
 # リポジトリのクローン
-git clone https://github.com/YOUR_USERNAME/ai-memo-api.git
-cd ai-memo-api
+git clone https://github.com/jus2024/kiro-tutrial.git
+cd kiro-tutrial
 
 # 仮想環境の作成と有効化
 python3 -m venv venv
@@ -788,7 +788,7 @@ sam build --use-container
 ### サポート
 
 問題が解決しない場合:
-1. [GitHub Issues](https://github.com/YOUR_USERNAME/ai-memo-api/issues) で既存の問題を検索
+1. [GitHub Issues](https://github.com/jus2024/kiro-tutrial/issues) で既存の問題を検索
 2. 新しいIssueを作成（エラーメッセージとログを含める）
 3. [AWS Bedrock ドキュメント](https://docs.aws.amazon.com/bedrock/)を参照
 
@@ -804,7 +804,7 @@ sam delete
 
 ### バグ報告
 
-バグを見つけた場合は、[GitHub Issues](https://github.com/YOUR_USERNAME/ai-memo-api/issues)で報告してください。
+バグを見つけた場合は、[GitHub Issues](https://github.com/jus2024/kiro-tutrial/issues)で報告してください。
 
 報告時に含めるべき情報:
 - バグの説明
@@ -842,8 +842,8 @@ sam delete
 
 ```bash
 # フォークしたリポジトリをクローン
-git clone https://github.com/YOUR_USERNAME/ai-memo-api.git
-cd ai-memo-api
+git clone https://github.com/YOUR_USERNAME/kiro-tutrial.git
+cd kiro-tutrial
 
 # 仮想環境を作成
 python3 -m venv venv
@@ -878,8 +878,7 @@ mypy src/
 ## 📞 連絡先
 
 質問や提案がある場合:
-- GitHub Issues: [https://github.com/YOUR_USERNAME/ai-memo-api/issues](https://github.com/YOUR_USERNAME/ai-memo-api/issues)
-- Email: your.email@example.com
+- GitHub Issues: [https://github.com/jus2024/kiro-tutrial/issues](https://github.com/jus2024/kiro-tutrial/issues)
 
 ---
 
