@@ -1,0 +1,5 @@
+{
+  "httpMethod": "POST",
+  "path": "/memos",
+  "body": "{\"title\": \"Sample Memo\", \"content\": \"This is a sample memo for testing purposes.\"}"
+}

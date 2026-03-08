@@ -1,0 +1,8 @@
+{
+  "httpMethod": "POST",
+  "path": "/memos/123e4567-e89b-12d3-a456-426614174000/ask",
+  "pathParameters": {
+    "id": "123e4567-e89b-12d3-a456-426614174000"
+  },
+  "body": "{\"question\": \"このメモの要点は何ですか？\"}"
+}

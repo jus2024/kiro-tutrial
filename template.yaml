@@ -1,0 +1,279 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AI要約API - Serverless memo management with AI-powered question answering
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 10
+    MemorySize: 512
+    Environment:
+      Variables:
+        MEMO_TABLE_NAME: !Ref MemoTable
+        LOG_LEVEL: INFO
+        POWERTOOLS_SERVICE_NAME: ai-summary-api
+    Tracing: Active
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+Resources:
+  # DynamoDB Table
+  MemoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Environment}-ai-summary-memos'
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: entity_type
+          AttributeType: S
+        - AttributeName: updated_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UpdatedAtIndex
+          KeySchema:
+            - AttributeName: entity_type
+              KeyType: HASH
+            - AttributeName: updated_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: ai-summary-api
+
+  # Memo Lambda Function
+  MemoFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.13
+    Properties:
+      FunctionName: !Sub '${Environment}-ai-summary-memo-function'
+      CodeUri: src/
+      Handler: functions.memo.handler.lambda_handler
+      Description: Handles memo CRUD operations
+      Environment:
+        Variables:
+          MEMO_TABLE_NAME: !Ref MemoTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MemoTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub '${MemoTable.Arn}/index/UpdatedAtIndex'
+      Events:
+        CreateMemo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /memos
+            Method: POST
+        GetMemo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /memos/{id}
+            Method: GET
+        ListMemos:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /memos
+            Method: GET
+        UpdateMemo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /memos/{id}
+            Method: PUT
+        DeleteMemo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /memos/{id}
+            Method: DELETE
+      Tags:
+        Environment: !Ref Environment
+        Application: ai-summary-api
+
+  # AI Lambda Function
+  AIFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ai-summary-ai-function'
+      CodeUri: src/
+      Handler: functions.ai.handler.lambda_handler
+      Description: Handles AI-powered question answering using AWS Bedrock
+      Timeout: 35
+      MemorySize: 1024
+      Environment:
+        Variables:
+          MEMO_TABLE_NAME: !Ref MemoTable
+          BEDROCK_MODEL_ID: us.anthropic.claude-sonnet-4-6
+          BEDROCK_REGION: us-west-2
+          MAX_RETRIES: '3'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt MemoTable.Arn
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
+      Events:
+        AskQuestion:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /memos/{id}/ask
+            Method: POST
+      Tags:
+        Environment: !Ref Environment
+        Application: ai-summary-api
+    Metadata:
+      BuildMethod: python3.13
+
+  # All Memos Summary Lambda Function
+  AllMemosSummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ai-summary-all-memos-function'
+      CodeUri: src/
+      Handler: functions.all_memos_summary.handler.lambda_handler
+      Description: Generates AI-powered summary of all memos using AWS Bedrock
+      Timeout: 65
+      MemorySize: 1024
+      Environment:
+        Variables:
+          MEMO_TABLE_NAME: !Ref MemoTable
+          BEDROCK_MODEL_ID: us.anthropic.claude-sonnet-4-6
+          BEDROCK_REGION: us-west-2
+          MAX_RETRIES: '3'
+          MAX_CONTENT_TOKENS: '180000'
+          LOG_LEVEL: INFO
+          POWERTOOLS_SERVICE_NAME: ai-summary-api
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - !GetAtt MemoTable.Arn
+                - !Sub '${MemoTable.Arn}/index/UpdatedAtIndex'
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Environment}-ai-summary-all-memos-function:*'
+            - Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
+      Events:
+        GenerateSummary:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /memos/summary
+            Method: POST
+      Tags:
+        Environment: !Ref Environment
+        Application: ai-summary-api
+    Metadata:
+      BuildMethod: python3.13
+
+  # API Gateway
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub '${Environment}-ai-summary-api'
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      TracingEnabled: true
+      Tags:
+        Environment: !Ref Environment
+        Application: ai-summary-api
+
+  # CloudWatch Log Group for Memo Function
+  MemoFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Environment}-ai-summary-memo-function'
+      RetentionInDays: 7
+
+  # CloudWatch Log Group for AI Function
+  AIFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Environment}-ai-summary-ai-function'
+      RetentionInDays: 7
+
+  # CloudWatch Log Group for All Memos Summary Function
+  AllMemosSummaryFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Environment}-ai-summary-all-memos-function'
+      RetentionInDays: 7
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${Environment}-ai-summary-api-endpoint'
+
+  MemoTableName:
+    Description: DynamoDB table name for memos
+    Value: !Ref MemoTable
+    Export:
+      Name: !Sub '${Environment}-ai-summary-memo-table'
+
+  MemoFunctionArn:
+    Description: Memo Lambda function ARN
+    Value: !GetAtt MemoFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-ai-summary-memo-function-arn'
+
+  AIFunctionArn:
+    Description: AI Lambda function ARN
+    Value: !GetAtt AIFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-ai-summary-ai-function-arn'
+
+  AllMemosSummaryFunctionArn:
+    Description: All Memos Summary Lambda function ARN
+    Value: !GetAtt AllMemosSummaryFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-ai-summary-all-memos-function-arn'
