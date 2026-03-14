@@ -18,6 +18,7 @@ AWS上でサーバーレスに稼働するRESTful APIサービス。メモの作
 - [テスト](#-テスト)
 - [トラブルシューティング](#-トラブルシューティング)
 - [ライセンス](#-ライセンス)
+- [付録: Kiro AI アシスタント設定](#付録-kiro-ai-アシスタント設定-kiro)
 
 ## ✨ 機能
 
@@ -923,3 +924,63 @@ mypy src/
 ---
 
 ⭐ このプロジェクトが役に立った場合は、GitHubでスターをつけてください！
+
+---
+
+## 付録: Kiro AI アシスタント設定 (`.kiro/`)
+
+このプロジェクトは [Kiro](https://kiro.dev) AIアシスタントと連携して開発されました。`.kiro/` ディレクトリにはKiroの動作をカスタマイズする設定ファイルが含まれています。
+
+```
+.kiro/
+├── steering/       # AIへの常時コンテキスト指示
+├── specs/          # 機能仕様書（要件・設計・タスク）
+├── hooks/          # IDEイベントに連動する自動化フック
+├── skills/         # AIの専門スキル定義
+└── settings/       # MCP等の設定
+```
+
+### steering/ — AIへの常時指示
+
+Kiroとの全会話に自動的に含まれるプロジェクト固有のガイドラインです。
+
+| ファイル | 内容 |
+|---------|------|
+| `product.md` | プロダクト概要・アーキテクチャ原則 |
+| `tech.md` | 技術スタック・ビルドコマンド・依存関係 |
+| `structure.md` | プロジェクト構成規約 |
+| `aws-design.md` | AWSサーバーレス設計プラクティス |
+
+### specs/ — 機能仕様書
+
+各機能の要件定義・設計・実装タスクを管理するドキュメントです。Kiroの「Spec」機能で作成・管理されます。
+
+| ディレクトリ | 機能 |
+|------------|------|
+| `ai-summary-api/` | AIメモ要約APIの初期設計 |
+| `all-memos-summary/` | 全メモ一括要約機能 |
+| `api-response-formatting/` | Acceptヘッダーによるレスポンス形式切り替え |
+
+各specは `requirements.md`（要件）、`design.md`（設計）、`tasks.md`（実装タスク）の3ファイルで構成されます。
+
+### hooks/ — 自動化フック
+
+ファイル保存などのIDEイベントをトリガーにKiroが自動実行するアクションです。
+
+| フック | トリガー | 動作 |
+|-------|---------|------|
+| `code-quality-review.kiro.hook` | `.py` `.ts` 等のソースファイル保存時 | コード品質レビュー（コードスメル・設計パターン・セキュリティ等）を自動実施 |
+| `docs-on-code-change.kiro.hook` | `.py` `template.yaml` `requirements.txt` 保存時 | `README.md` / `docs/` の関連ドキュメントを自動更新 |
+
+### skills/ — AIスキル定義
+
+特定タスクに特化したKiroの専門知識・手順を定義します。
+
+| スキル | 内容 |
+|-------|------|
+| `deploy/` | `sam build` → `sam deploy` の手順とOutputs表示 |
+| `cloudformation/` | CloudFormationテンプレート作成・スタック管理・トラブルシューティング |
+
+### settings/ — MCP設定
+
+`settings/mcp.json` にModel Context Protocol（MCP）サーバーの設定が含まれています。MCPはKiroが外部ツールやサービスと連携するためのプロトコルです。
