@@ -104,7 +104,16 @@ pytest --cov=src --cov-report=html
 | メソッド | パス | 説明 |
 |---------|------|------|
 | POST | /memos/{id}/ask | 個別メモへのAI質問 |
-| POST | /memos/summary | 全メモのAI要約生成 |
+| POST | /memos/summary | 全メモのAI要約生成（`Accept` ヘッダーでJSON/テキスト形式を選択可） |
+
+#### コンテンツネゴシエーション
+
+`POST /memos/summary` は `Accept` ヘッダーによるレスポンス形式の切り替えをサポートしています：
+
+| Accept ヘッダー | レスポンス形式 |
+|----------------|--------------|
+| `application/json`（デフォルト） | JSON形式 |
+| `text/plain` | 人間が読みやすいテキスト形式（📝絵文字・区切り線付き） |
 
 ## 使用例
 
@@ -132,8 +141,15 @@ curl -X POST https://api.example.com/memos/{memo_id}/ask \
 ### 全メモの要約生成
 
 ```bash
+# JSON形式（デフォルト）
 curl -X POST https://api.example.com/memos/summary \
   -H "Content-Type: application/json" \
+  -d '{}'
+
+# テキスト形式（ターミナルで読みやすい）
+curl -X POST https://api.example.com/memos/summary \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/plain" \
   -d '{}'
 ```
 
@@ -264,4 +280,4 @@ aws logs filter-log-events \
 
 ---
 
-最終更新: 2024年1月
+最終更新: 2026年3月

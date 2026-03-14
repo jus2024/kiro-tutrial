@@ -14,6 +14,7 @@ from models.memo import ValidationError
 from repositories.memo_repository import MemoRepository
 from services.memo_aggregator import MemoAggregator
 from services.bedrock_service import BedrockService, ServiceUnavailableError
+from utils.response_formatter import ResponseFormatter
 
 logger = Logger()
 metrics = Metrics(namespace="AIMemoryAPI")
@@ -192,26 +193,31 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 metrics.add_metric(name="MemosProcessed", unit=MetricUnit.Count, value=0)
                 metrics.add_metric(name="ProcessingTime", unit=MetricUnit.Milliseconds, value=processing_time_ms)
                 
-                response_body = {
-                    'summary': 'メモが存在しないため、要約を生成できません。',
-                    'metadata': {
-                        'model_id': os.environ.get('BEDROCK_MODEL_ID', 'us.anthropic.claude-sonnet-4-6'),
-                        'processing_time_ms': processing_time_ms,
-                        'memos_included': 0,
-                        'memos_total': 0,
-                        'truncated': False
-                    }
+                # Task 7.1: Use ResponseFormatter for empty collection response
+                summary_text = 'メモが存在しないため、要約を生成できません。'
+                metadata = {
+                    'model_id': os.environ.get('BEDROCK_MODEL_ID', 'us.anthropic.claude-sonnet-4-6'),
+                    'processing_time_ms': processing_time_ms,
+                    'memos_included': 0,
+                    'memos_total': 0,
+                    'truncated': False
                 }
                 
+                # Extract Accept header from event
+                accept_header = event.get("headers", {}).get("Accept") or event.get("headers", {}).get("accept")
+                
+                # Format response using ResponseFormatter
+                formatter = ResponseFormatter()
+                formatted = formatter.format_response(
+                    summary=summary_text,
+                    metadata=metadata,
+                    accept_header=accept_header
+                )
+                
                 return {
-                    'statusCode': 200,
-                    'headers': {
-                        'Content-Type': 'application/json; charset=utf-8',
-                        'Access-Control-Allow-Origin': '*',
-                        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                        'Access-Control-Allow-Headers': 'Content-Type'
-                    },
-                    'body': json.dumps(response_body, ensure_ascii=False)
+                    'statusCode': formatted.status_code,
+                    'headers': formatted.headers,
+                    'body': formatted.content
                 }
             
             # Aggregate memos with content limits
@@ -278,27 +284,30 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             metrics.add_metric(name="MemosProcessed", unit=MetricUnit.Count, value=aggregation_result.included_count)
             metrics.add_metric(name="ProcessingTime", unit=MetricUnit.Milliseconds, value=processing_time_ms)
             
-            # Task 5.5: Format response with UTF-8 encoding
-            response_body = {
-                'summary': summary_text,
-                'metadata': {
-                    'model_id': model_id,
-                    'processing_time_ms': processing_time_ms,
-                    'memos_included': aggregation_result.included_count,
-                    'memos_total': aggregation_result.total_count,
-                    'truncated': aggregation_result.truncated
-                }
+            # Task 7.1: Use ResponseFormatter for successful summary response
+            metadata = {
+                'model_id': model_id,
+                'processing_time_ms': processing_time_ms,
+                'memos_included': aggregation_result.included_count,
+                'memos_total': aggregation_result.total_count,
+                'truncated': aggregation_result.truncated
             }
             
+            # Extract Accept header from event
+            accept_header = event.get("headers", {}).get("Accept") or event.get("headers", {}).get("accept")
+            
+            # Format response using ResponseFormatter
+            formatter = ResponseFormatter()
+            formatted = formatter.format_response(
+                summary=summary_text,
+                metadata=metadata,
+                accept_header=accept_header
+            )
+            
             return {
-                'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json; charset=utf-8',
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type'
-                },
-                'body': json.dumps(response_body, ensure_ascii=False)
+                'statusCode': formatted.status_code,
+                'headers': formatted.headers,
+                'body': formatted.content
             }
             
         except ServiceUnavailableError as e:

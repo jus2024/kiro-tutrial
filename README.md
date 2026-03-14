@@ -87,6 +87,7 @@ AWS上でサーバーレスに稼働するRESTful APIサービス。メモの作
 │   ├── repositories/      # データアクセス層
 │   ├── services/          # ビジネスロジック
 │   └── utils/             # ユーティリティ関数
+│       └── response_formatter.py  # レスポンスフォーマッター
 ├── tests/
 │   ├── unit/              # ユニットテスト
 │   ├── property/          # プロパティベーステスト
@@ -287,6 +288,13 @@ https://xxxxxxxxxx.execute-api.us-west-2.amazonaws.com/dev
 
 - `POST /memos/summary` - 全メモの包括的な要約を生成
 
+### コンテンツネゴシエーション
+
+APIは `Accept` ヘッダーによるコンテンツネゴシエーションをサポートしています：
+
+- `Accept: application/json` - JSON形式（デフォルト）
+- `Accept: text/plain` - 人間が読みやすいテキスト形式
+
 ### 使用例
 
 ```bash
@@ -306,12 +314,18 @@ curl -X POST $API_URL/memos/{memo_id}/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"このメモの内容を要約してください"}'
 
-# 全メモ要約生成
+# 全メモ要約生成（JSON形式）
 curl -X POST $API_URL/memos/summary \
   -H "Content-Type: application/json" \
   -d '{}'
 
-# 全メモ要約を見やすく整形して表示
+# 全メモ要約生成（テキスト形式 - 読みやすい）
+curl -X POST $API_URL/memos/summary \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/plain" \
+  -d '{}'
+
+# 全メモ要約を見やすく整形して表示（JSON形式の場合）
 curl -X POST $API_URL/memos/summary \
   -H "Content-Type: application/json" \
   -d '{}' | python3 scripts/format_summary.py
@@ -319,7 +333,7 @@ curl -X POST $API_URL/memos/summary \
 
 #### レスポンス例
 
-**全メモ要約のレスポンス:**
+**全メモ要約のレスポンス（JSON形式）:**
 ```json
 {
   "summary": "あなたのメモには主に3つのテーマがあります：1) プロジェクト管理に関するタスクとマイルストーン、2) 技術的な学習メモとコードスニペット、3) 個人的なアイデアと将来の計画。最近のメモでは、AWS Lambdaを使用したサーバーレスアーキテクチャの実装に焦点を当てています...",
@@ -331,6 +345,30 @@ curl -X POST $API_URL/memos/summary \
     "truncated": false
   }
 }
+```
+
+**全メモ要約のレスポンス（テキスト形式）:**
+```
+================================================================================
+📝 メモ要約結果
+================================================================================
+
+📊 処理情報:
+  • 処理時間: 3.25秒
+  • 要約対象: 50/50件のメモ
+  • モデル: us.anthropic.claude-sonnet-4-6
+  • 切り詰め: なし
+
+--------------------------------------------------------------------------------
+
+📄 要約内容:
+
+あなたのメモには主に3つのテーマがあります：1) プロジェクト管理に関するタスクと
+マイルストーン、2) 技術的な学習メモとコードスニペット、3) 個人的なアイデアと
+将来の計画。最近のメモでは、AWS Lambdaを使用したサーバーレスアーキテクチャの
+実装に焦点を当てています...
+
+================================================================================
 ```
 
 **空のメモコレクションの場合:**
@@ -363,6 +401,8 @@ pip install -r requirements.txt
 
 # pytest, hypothesis, moto などがインストールされます
 ```
+
+> `tests/conftest.py` はプロジェクトルートをPythonパスに追加します。テストコードでは `from src.xxx import ...` 形式でインポートしてください。
 
 ### ユニットテスト実行
 
@@ -689,18 +729,18 @@ aws logs filter-log-events \
 
 #### 2. No module named 'src' エラー
 
-**症状**: Lambda実行時に `ModuleNotFoundError: No module named 'src'`
+**症状**: テスト実行時に `ModuleNotFoundError: No module named 'src'`
 
-**原因**: Lambda環境では `src.` プレフィックスが不要
+**原因**: `tests/conftest.py` がプロジェクトルートをPythonパスに追加しているため、テストコードでは `src.` プレフィックスが必要
 
 **対処**:
 ```python
-# ❌ 間違い
+# ✅ テストコードでの正しいインポート（プロジェクトルート基準）
 from src.models.summary_models import AggregationResult
-
-# ✅ 正しい
-from models.summary_models import AggregationResult
+from src.utils.response_formatter import ResponseFormatter
 ```
+
+> **注意**: Lambda関数本体（`src/` 配下）では `src.` プレフィックスは不要です。Lambda環境ではデプロイパッケージのルートが `src/` になるためです。
 
 #### 3. 文字化け（日本語が正しく表示されない）
 
